@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en-US">
+
+<head>
+    <meta charset="utf-8">
+    <title>Permit List</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #container {
+            display: flex;
+            height: 100vh;
+            flex-direction: row;
+            align-items: stretch;
+        }
+
+        #side-panel {
+            flex-basis: 500px;
+            overflow-y: scroll;
+        }
+
+        @media screen and (max-width: 1024px) {
+
+            #side-panel {
+                display: none;
+            }
+
+        }
+
+        #map {
+            flex-grow: 1;
+        }
+
+        button {
+            margin-bottom: 10px;
+        }
+
+        table {
+            border-collapse: collapse;
+            border-spacing: 0;
+            width: 100%;
+            border: 1px solid #ddd;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 16px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+
+<body>
+    <main id="container">
+        <div id="side-panel">
+
+            <h2>Residential Demolition Permit List</h2>
+            <button>Sort by Units Demo'ed</button>
+
+            <table>
+                <tr>
+                    <th>Units Demo'ed</th>
+                    <th>Year Issued</th>
+                </tr>
+            </table>
+
+        </div>
+        <div id="map"></div>
+    </main>
+    <script>
+        mapboxgl.accessToken =
+            'pk.eyJ1IjoiamFrb2J6aGFvIiwiYSI6ImNpcms2YWsyMzAwMmtmbG5icTFxZ3ZkdncifQ.P9MBej1xacybKcDN_jehvw';
+        let map = new mapboxgl.Map({
+            container: 'map', // container ID
+            style: 'mapbox://styles/mapbox/satellite-v9', // style URL
+            zoom: 10.5, // starting zoom
+            center: [-122.3626438965025, 47.623469940234047] // starting center
+        });
+
+        async function geojsonFetch() {
+            let response, permits, tracts, table;
+            response = await fetch('assets/permits.geojson');
+            permits = await response.json();
+            response = await fetch('assets/Census_Tracts.geojson');
+            tracts = await response.json();
+
+            map.on('load', function loadingData() {
+
+                map.addSource('tracts', {
+                    type: 'geojson',
+                    data: tracts
+                });
+
+                map.addLayer({
+                    'id': 'tracts-layer',
+                    'type': 'fill',
+                    'source': 'tracts',
+                    'paint': {
+                        'fill-color': '#0080ff', // blue color fill
+                        'fill-outline-color': '#ffffff', // classic white border
+                        'fill-opacity': 0.8
+                    }
+                });
+
+                map.addSource('permits', {
+                    type: 'geojson',
+                    data: permits
+                });
+
+                map.addLayer({
+                    'id': 'permits-layer',
+                    'type': 'circle',
+                    'source': 'permits',
+                    'paint': {
+                        'circle-radius': 3,
+                        'circle-stroke-width': 1,
+                        'circle-color': 'white',
+                        'circle-stroke-color': 'black'
+                    }
+                });
+
+
+            });
+
+            table = document.getElementsByTagName("table")[0];
+            let row, cell2, cell3;
+            for (let i = 0; i < permits.features.length; i++) {
+                // Create an empty <tr> element and add it to the 1st position of the table:
+                row = table.insertRow(-1);
+                cell2 = row.insertCell(0);
+                cell3 = row.insertCell(1);
+                cell2.innerHTML = permits.features[i].properties.DEMO;
+                cell3.innerHTML = permits.features[i].properties.YEAR_ISSUE;
+            }
+
+        };
+        geojsonFetch();
+
+        let btn = document.getElementsByTagName("button")[0];
+
+        btn.addEventListener('click', sortTable);
+        // This was incredibly slow. I improved it a bit
+        function sortTable(e) {
+            e.target.innerHTML = 'Sorting... 0%';
+            e.target.setAttribute('disabled', 'true');
+            setTimeout(sortHelper, 100, e.target);
+        }
+
+
+        function sortHelper(button) {
+            button.innerHTML =
+                `Sorting... ${Math.ceil((parseFloat(button.innerHTML.replace('Sorting... ', '').replace('%', '')) / 100 + 1 / 25000 * 12 * 10000 / 10000) * 100 * 100) / 100}%`;
+
+            let table, rows, switching, i, x, y, shouldSwitch;
+            table = document.getElementsByTagName("table")[0];
+            rows = table.rows;
+            shouldSwitch = false;
+            for (i = 1; i < (rows.length - 1); i++) {
+                x = parseFloat(rows[i].getElementsByTagName("td")[0].innerHTML);
+                y = parseFloat(rows[i + 1].getElementsByTagName("td")[0].innerHTML);
+                if (x < y) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    shouldSwitch = true;
+                }
+            }
+            if (shouldSwitch) {
+                setTimeout(sortHelper, 1, button);
+            } else {
+                button.removeAttribute('disabled');
+                button.innerHTML = 'Sort by Units Demo\'ed';
+            }
+        }
+    </script>
+</body>
+
+</html>
